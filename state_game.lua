@@ -18,7 +18,7 @@ local protoFood = {}
 
 local temp = 0
 
-local Initialise,Draw,Update, playerFilter
+local Initialise,Draw,Update, playerFilter, setAnim, updateDino
 
 Initialise = function(coreAssets)
   readyForInput = false
@@ -31,8 +31,8 @@ Initialise = function(coreAssets)
 
   bub.x = 64;      bub.y = 0; bub.dx = 0; bub.dy = 0;
   bob.x = 64 * 18; bob.y = 0; bob.dx = 0; bob.dy = 0;
-  levelWorld:add(bub, bub.x,bub.y,42,50)
-  levelWorld:add(bob, bob.x,bob.y,42,50)
+  levelWorld:add(bub, bub.x,bub.y,34,50) -- the hit boxes are smaller than the graphics
+  levelWorld:add(bob, bob.x,bob.y,34,50)
 
   local sw = assets.creepSheet:getWidth()
   local sh = assets.creepSheet:getHeight()
@@ -40,17 +40,27 @@ Initialise = function(coreAssets)
 
   bub.anims['right'] = anim8.newAnimation(grid('5-10',1), 0.07)
   bub.anims['left'] = anim8.newAnimation(grid('3-8',2), 0.07)
+  bub.anims['rightIdle'] = anim8.newAnimation(grid(3,1), 1)
+  bub.anims['leftIdle'] = anim8.newAnimation(grid(10,2), 1)
   bub.anims['rightBurp'] = anim8.newAnimation(grid('3-4',1), 0.7)
   bub.anims['leftBurp'] = anim8.newAnimation(grid('10-9',2), 0.7)
-  bub.anims['rightJump'] = anim8.newAnimation(grid('11-17',1), 0.1)--, 'pauseAtEnd')
-  bub.anims['leftJump'] = anim8.newAnimation(grid('17-11',2), 0.1)--, 'pauseAtEnd')
+  bub.anims['rightJump'] = anim8.newAnimation(grid('11-17',1), 0.1, 'pauseAtEnd')
+  bub.anims['leftJump'] = anim8.newAnimation(grid('17-11',2), 0.1, 'pauseAtEnd')
+  bub.anim = bub.anims['rightIdle']:clone()
+  bub.currentAnim = 'rightIdle'
+  bub.lastDir = 'right'
 
   bob.anims['right'] = anim8.newAnimation(grid('5-10',3), 0.07)
   bob.anims['left'] = anim8.newAnimation(grid('3-8',4), 0.07)
+  bob.anims['rightIdle'] = anim8.newAnimation(grid(3,3), 1)
+  bob.anims['leftIdle'] = anim8.newAnimation(grid(10,4), 1)
   bob.anims['rightBurp'] = anim8.newAnimation(grid('3-4',3), 0.7)
   bob.anims['leftBurp'] = anim8.newAnimation(grid('10-9',4), 0.7)
-  bob.anims['rightJump'] = anim8.newAnimation(grid('11-17',3), 0.1)--, 'pauseAtEnd')
-  bob.anims['leftJump'] = anim8.newAnimation(grid('17-11',4), 0.1)--, 'pauseAtEnd')
+  bob.anims['rightJump'] = anim8.newAnimation(grid('11-17',3), 0.1, 'pauseAtEnd')
+  bob.anims['leftJump'] = anim8.newAnimation(grid('17-11',4), 0.1, 'pauseAtEnd')
+  bob.anim = bob.anims['leftIdle']:clone()
+  bob.currentAnim = 'leftIdle'
+  bob.lastDir = 'left'
 
   zen.anims['right'] = anim8.newAnimation(grid('1-6',5), 0.07)
   zen.anims['left'] = anim8.newAnimation(grid('1-6',6), 0.07)
@@ -70,56 +80,104 @@ playerFilter = function(item, other)
   -- else return nil
 end
 
+-- set the animation for either bub or bob
+setAnim = function(char)
+  if not char.canJump then
+    if (char.dx < 0) then
+      char.lastDir = 'left'
+      if (char.currentAnim ~= 'leftJump') then
+        char.anim = char.anims['leftJump']:clone()
+        char.currentAnim = 'leftJump'
+      end
+    elseif (char.dx > 0) then
+      char.lastDir = 'right'
+      if (char.currentAnim ~= 'rightJump') then
+        char.anim = char.anims['rightJump']:clone()
+        char.currentAnim = 'rightJump'
+      end
+    else
+      local dirj = char.lastDir..'Jump'
+      if (char.currentAnim ~= dirj) then
+        char.anim = char.anims[dirj]:clone()
+        char.currentAnim = dirj
+      end
+    end
+  else
+    if (char.dx < 0) then
+      char.lastDir = 'left'
+      char.currentAnim = 'left'
+      char.anim = char.anims['left']
+    elseif (char.dx > 0) then
+      char.lastDir = 'right'
+      char.currentAnim = 'right'
+      char.anim = char.anims['right']
+    else
+      char.anim = char.anims[char.lastDir..'Idle']
+      char.currentAnim = char.lastDir..'Idle'
+    end
+  end
+end
+
+updateDino = function (char, ctrl, dt)
+    if ctrl.up then
+      if (char.canJump) then
+        char.dy = -200
+        char.canJump = false
+      end
+    end
+    if ctrl.down then char.dy = 0 end
+
+    if ctrl.left then char.dx = math.max(-200, char.dx - 10)
+    elseif ctrl.right then char.dx = math.min(200, char.dx + 10)
+    else
+      char.dx = char.dx / 2
+      if char.dx > -1 and char.dx < 1 then char.dx = 0 end
+    end
+
+    char.canJump = false -- assume we're falling unless stopped
+    char.dy = math.min(char.dy + 10, 400) -- gravity
+    local goalX = char.x + (char.dx * dt)
+    local goalY = char.y + (char.dy * dt)
+    local actualX, actualY, cols, len = levelWorld:move(char, goalX, goalY, playerFilter)
+    if (actualY == char.y) and (char.dy > 0) then
+      char.dy = 0
+      char.canJump = true
+    end -- reset if blocked
+    char.x = actualX
+    char.y = actualY
+    if (char.y > screenHeight) then -- fell off the bottom. wrap to top
+      levelWorld:update(char, char.x, 0)
+      char.y = 0
+    end
+    setAnim(char)
+end
+
 Update = function(dt, keyDownCount, connectedPad)
   if (dt > 1) then return end
   temp = temp + (dt * 70)
   if (temp > 100) then temp = 0 end
 
-  if love.keyboard.isDown("up") then
-    if (bub.canJump) then
-      bub.dy = -200
-      bub.canJump = false
-    end
-  end
-  if love.keyboard.isDown("down") then bub.dy = 0 end
+  local ctrl = {
+    up = love.keyboard.isDown("up"),
+    down = love.keyboard.isDown("down"),
+    left = love.keyboard.isDown("left"),
+    right = love.keyboard.isDown("right"),
+    act = love.keyboard.isDown("space")
+  }
+  updateDino(bub, ctrl, dt)
 
-  if love.keyboard.isDown("left") then bub.dx = math.max(-200, bub.dx - 10)
-  elseif love.keyboard.isDown("right") then bub.dx = math.min(200, bub.dx + 10)
-  else
-    bub.dx = bub.dx / 2
-    if bub.dx > -1 and bub.dx < 1 then bub.dx = 0 end
-  end
+  ctrl = {
+    up = love.keyboard.isDown("w"),
+    down = love.keyboard.isDown("s"),
+    left = love.keyboard.isDown("a"),
+    right = love.keyboard.isDown("d"),
+    act = love.keyboard.isDown("ctrl")
+  }
+  updateDino(bob, ctrl, dt)
 
-  bub.canJump = false -- assume we're falling unless stopped
-  bub.dy = math.min(bub.dy + 10, 400) -- gravity
-  local goalX = bub.x + (bub.dx * dt)
-  local goalY = bub.y + (bub.dy * dt)
-  local actualX, actualY, cols, len = levelWorld:move(bub, goalX, goalY, playerFilter)
-  if (actualY == bub.y) and (bub.dy > 0) then
-    bub.dy = 0
-    bub.canJump = true
-  end -- reset if blocked
-  bub.x = actualX
-  bub.y = actualY
 
-  bub.anims['right']:update(dt)
-  bub.anims['left']:update(dt)
-  bub.anims['rightBurp']:update(dt)
-  bub.anims['leftBurp']:update(dt)
-  bub.anims['rightJump']:update(dt)
-  bub.anims['leftJump']:update(dt)
-
-  bob.anims['right']:update(dt)
-  bob.anims['left']:update(dt)
-  bob.anims['rightBurp']:update(dt)
-  bob.anims['leftBurp']:update(dt)
-  bob.anims['rightJump']:update(dt)
-  bob.anims['leftJump']:update(dt)
-
-  zen.anims['right']:update(dt)
-  zen.anims['left']:update(dt)
-  zen.anims['rightFall']:update(dt)
-  zen.anims['leftFall']:update(dt)
+  bub.anim:update(dt)
+  bob.anim:update(dt)
 
   protoFood.anim:update(dt)
 end
@@ -129,56 +187,14 @@ Draw = function()
   love.graphics.draw(assets.levelBg1, 0, 0, 0, 1, 1)
   love.graphics.draw(blockImage, 0, 0, 0, 1, 1)
 
-  --sprite test
   love.graphics.setColor(255, 255, 255, 255)
 
-  if not bub.canJump then
-    if (bub.dx < 0) then
-        bub.anims['leftJump']:draw(assets.creepSheet,bub.x - 9, bub.y - 14, 0, zoom)
-    else
-        bub.anims['rightJump']:draw(assets.creepSheet,bub.x - 9, bub.y - 14, 0, zoom)
-    end
-  else
-    if (bub.dx < 0) then
-        bub.anims['left']:draw(assets.creepSheet,bub.x - 9, bub.y - 14, 0, zoom)
-    elseif (bub.dx > 0) then
-        bub.anims['right']:draw(assets.creepSheet,bub.x - 9, bub.y - 14, 0, zoom)
-    else
-      bub.anims['leftBurp']:draw(assets.creepSheet,bub.x - 9, bub.y - 14, 0, zoom)
-    end
-  end
+  bub.anim:draw(assets.creepSheet,bub.x - 16, bub.y - 14, 0, zoom)
+  bob.anim:draw(assets.creepSheet,bob.x - 16, bob.y - 14, 0, zoom)
 
---[[
+  --[[
   love.graphics.setFont(assets.smallfont)
   centreSmallString("sprite test", screenWidth/2, screenHeight/2, 2)
-  centreSmallString("esc to quit", screenWidth/2, 70+screenHeight/2, 2)
-
-  local x = 300
-  local y = 100
-  local zoom = 1
-
-  bub.anims['right']:draw(assets.creepSheet,x+ temp, y,0, zoom)
-  bub.anims['left']:draw(assets.creepSheet,x - temp, y,0, zoom)
-  bub.anims['rightBurp']:draw(assets.creepSheet,x, y+100,0, zoom)
-  bub.anims['leftBurp']:draw(assets.creepSheet,x-70, y+100,0, zoom)
-  bub.anims['rightJump']:draw(assets.creepSheet,x, y+180,0, zoom)
-  bub.anims['leftJump']:draw(assets.creepSheet,x-70, y+180,0, zoom)
-
-  x = 700
-  bob.anims['right']:draw(assets.creepSheet,x + temp, y,0, zoom)
-  bob.anims['left']:draw(assets.creepSheet,x - temp, y,0, zoom)
-  bob.anims['rightBurp']:draw(assets.creepSheet,x, y+100,0, zoom)
-  bob.anims['leftBurp']:draw(assets.creepSheet,x-70, y+100,0, zoom)
-  bob.anims['rightJump']:draw(assets.creepSheet,x, y+180,0, zoom)
-  bob.anims['leftJump']:draw(assets.creepSheet,x-70, y+180,0, zoom)
-
-  x = 200
-  y = 400
-  zen.anims['right']:draw(assets.creepSheet,x + temp, y,0, zoom)
-  zen.anims['left']:draw(assets.creepSheet,x - 70 - temp, y,0, zoom)
-  zen.anims['rightFall']:draw(assets.creepSheet,x, y+100,0, zoom)
-  zen.anims['leftFall']:draw(assets.creepSheet,x-70, y+100,0, zoom)
-
   protoFood.anim:draw(assets.creepSheet,70, 70,0, zoom / 2)]]
 end
 

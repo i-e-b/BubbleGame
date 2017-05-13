@@ -23,6 +23,12 @@ local loadLevel = function(num)
       end
     end
   end
+
+  -- Add some safety blocks at the top
+  local lsb = {isWall=true, x = 0, y = 0}
+  world:add(lsb, lsb.x,lsb.y,64,64)
+  local rsb = {isWall=true, x = 19*64, y = 0}
+  world:add(rsb, rsb.x,rsb.y,64,64)
   return world
 end
 
