@@ -34,7 +34,7 @@ function love.load()
   assets.levelBg1 = backgroundGen.drawBgToImg(screenWidth, screenHeight, 244, 140, 170)
 
 
-  assets.creepSheet:setFilter("linear", "linear")
+  assets.creepSheet:setFilter("linear", "nearest")
   assets.bigfont:setFilter("linear", "linear")
   assets.smallfont:setFilter("linear", "nearest")
 
@@ -69,6 +69,14 @@ function centreSmallString(str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.smallfont:getWidth(str) / 2
   love.graphics.print(str, math.floor(x - w), math.floor(y), 0, scale)
+end
+
+function indexInTable(tab, obj)
+  local i
+  for i=1,#tab do
+    if tab[i] == obj then return i end
+  end
+  return nil
 end
 
 runSetup = function()
