@@ -46,7 +46,7 @@ function love.load()
   assets.walkSnd = love.audio.newSource("assets/walk.wav")
   assets.coinSnd = love.audio.newSource("assets/coin.wav")]]
 
-
+  math.randomseed(os.time())
   state_titleScreen.Initialise(assets)
   state_game.Initialise(assets)
 

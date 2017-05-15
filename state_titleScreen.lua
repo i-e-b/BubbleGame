@@ -122,7 +122,7 @@ Draw = function()
   local xpos = screenWidth / 2
   love.graphics.setColor(255, 255, 255, 255)
 
-    local strs = {" Start Game ", " Configure ", " Quit "}
+    local strs = {" 20 Minutes ", " 10 Minutes ", " Quit "}
   strs[selection] = "[" .. strs[selection] .. "]"
 
   for i=1,selectionMax do

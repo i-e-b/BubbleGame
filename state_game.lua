@@ -11,17 +11,19 @@ local levelWorld, blockImage -- level collision and graphics
 local screenWidth, screenHeight
 local readyForInput
 
-local bub = {isPlayer=true, anims={}, canJump=false, burp=0} -- green dino
-local bob = {isPlayer=true, anims={}, canJump=false, burp=0} -- blue dino
+local bub = {isPlayer=true, anims={}, canJump=false, burp=0, score=0} -- green dino
+local bob = {isPlayer=true, anims={}, canJump=false, burp=0, score=0} -- blue dino
 local protoZen = {isCreep=true, anims={}} -- wind up robot
 local protoFood = {}
 
 local bubbles = {} -- see `triggerBubble` and `updateBubbles` functions
-local walkingZen = {}
+local walkingZen = {} -- list of robots
+local loots = {} -- list of food waiting to be picked up
 local leftStartX, rightStartX
 
 local Initialise,Draw,Update, playerFilter, setAnim, updateDino, triggerBubble,
-      drawBubbles, updateBubbles, bubbleFilter, addZen, drawZens, zenFilter
+      drawBubbles, updateBubbles, bubbleFilter, addZen, drawZens, zenFilter,
+      spawnLoot, updateLoot, drawLoot, removeLoot, fruitFilter
 
 Initialise = function(coreAssets)
   readyForInput = false
@@ -75,6 +77,7 @@ Initialise = function(coreAssets)
   protoFood.anim = anim8.newAnimation(grid('8-11',6), 1)
 
   addZen()
+  addZen()
 end
 
 addZen = function ()
@@ -83,16 +86,25 @@ addZen = function ()
   if left then
     zen.x = leftStartX
     zen.lastDir = "right"
-    zen.anim = zen.anims['right']
+    zen.anim = zen.anims['right']:clone()
     zen.dx = 100
   else
     zen.x = rightStartX
     zen.lastDir = "left"
-    zen.anim = zen.anims['left']
+    zen.anim = zen.anims['left']:clone()
     zen.dx = 100
   end
   levelWorld:add(zen, zen.x, zen.y, 34, 38)
   table.insert(walkingZen, zen)
+end
+
+spawnLoot = function(x, y)
+  local loot = {isFruit=true, x=x, y=y, dy= -240, age=0}
+  loot.anim = protoFood.anim:clone()
+  loot.anim:gotoFrame(math.random(1,4))
+
+  levelWorld:add(loot, loot.x, loot.y, 32, 18)
+  table.insert(loots, loot)
 end
 
 playerFilter = function(item, other)
@@ -110,13 +122,28 @@ end
 zenFilter = function(item, other)
   if other.isWall then
     return 'slide'
+  elseif other.isCreep then
+    return 'touch'
   end
+  return nil
+end
+
+fruitFilter = function(item, other)
+  if other.isWall then return 'bounce' end
   return nil
 end
 
 bubbleFilter = function(item, other)
   if other.isCreep then return 'cross' end
   return nil
+end
+
+removeLoot = function(loot)
+  local idx = indexInTable(loots, loot)
+  if (idx > 0) then
+    table.remove(loots, idx)
+    levelWorld:remove(loot)
+  end
 end
 
 -- set the animation for either bub or bob
@@ -195,10 +222,10 @@ updateZens = function(dt)
       zen.dx = -zen.dx
       if (zen.dx < 0) then
         zen.lastDir = "left"
-        zen.anim = zen.anims['left']
+        zen.anim = zen.anims['left']:clone()
       else
         zen.lastDir = "right"
-        zen.anim = zen.anims['right']
+        zen.anim = zen.anims['right']:clone()
       end
     end
 
@@ -253,7 +280,11 @@ updateDino = function (char, ctrl, dt)
     for i=1,len do
       local other = cols[i].other
       if (other.isBubble) and (other.age > 4) and (char.y + 42 > other.y) then
-        cols[i].other.shouldPop = true
+        other.shouldPop = true
+      elseif (other.isFruit) and (other.age > 2) then
+        removeLoot(other)
+        char.score = char.score + 1
+        other.shouldEat = true
       end
     end
 
@@ -296,16 +327,19 @@ updateBubbles = function(dt)
     b.y = actualY
 
     -- check to see if we hit any zens
-    for i=1,len do
-      local hit = cols[i]
-      local idx = indexInTable(walkingZen, hit.other)
-      if (idx > 0) then -- found a matching zen
-        local zen = walkingZen[idx]
-        b.captured = zen
-        zen.anim = zen.anims[zen.lastDir.."Fall"]
-        table.remove(walkingZen, idx)
-        levelWorld:remove(zen)
-        break -- one zen per bubble
+    if not b.captured then -- only if empty
+      for i=1,len do
+        local hit = cols[i]
+        local idx = indexInTable(walkingZen, hit.other)
+        if (idx > 0) then -- found a matching zen
+          local zen = walkingZen[idx]
+          b.captured = zen
+          b.age = 3.4 -- half a second until it can be popped
+          zen.anim = zen.anims[zen.lastDir.."Fall"]:clone()
+          table.remove(walkingZen, idx)
+          levelWorld:remove(zen)
+          break -- one zen per bubble
+        end
       end
     end
 
@@ -340,9 +374,32 @@ updateBubbles = function(dt)
       table.remove(bubbles, i)
       levelWorld:remove(b)
       i = i - 1
-      -- TODO: spawn loot
+      if (b.captured) then
+        addZen()
+        spawnLoot(b.x, b.y)
+      end
     end
   end
+end
+
+updateLoot = function(dt)
+    local i
+    for i=1,#loots do
+      local loot = loots[i]
+
+      loot.age = loot.age + dt
+
+      loot.dy = math.min(loot.dy + 10, 400) -- gravity
+      local goalX = loot.x
+      local goalY = loot.y + (loot.dy * dt)
+
+      local actualX, actualY, cols, len = levelWorld:move(loot, goalX, goalY, fruitFilter)
+      if actualY < goalY then
+        loot.dy = math.min(-100, (-loot.dy) * 0.8) -- bounce
+      end
+      loot.x = actualX
+      loot.y = actualY
+    end
 end
 
 Update = function(dt, keyDownCount, connectedPad)
@@ -368,11 +425,10 @@ Update = function(dt, keyDownCount, connectedPad)
 
   updateBubbles(dt)
   updateZens(dt)
+  updateLoot(dt)
 
   bub.anim:update(dt)
   bob.anim:update(dt)
-
-  protoFood.anim:update(dt)
 end
 
 drawBubbles = function ()
@@ -414,6 +470,15 @@ drawZens = function()
   end
 end
 
+drawLoot = function()
+  local i
+  love.graphics.setColor(255, 255, 255, 255)
+  for i=1,#loots do
+    local loot = loots[i]
+    loot.anim:draw(assets.creepSheet, loot.x, loot.y - 14, 0, 0.5)
+  end
+end
+
 Draw = function()
   love.graphics.setBackgroundColor(0, 0, 0, 255)
   love.graphics.setColor(255, 255, 255, 255)
@@ -425,13 +490,15 @@ Draw = function()
   bub.anim:draw(assets.creepSheet,bub.x - 16, bub.y - 13)
   bob.anim:draw(assets.creepSheet,bob.x - 16, bob.y - 13)
 
+  drawLoot()
   drawBubbles()
   drawZens()
 
-  --[[
   love.graphics.setFont(assets.smallfont)
-  centreSmallString("sprite test", screenWidth/2, screenHeight/2, 2)
-  protoFood.anim:draw(assets.creepSheet,70, 70,0, zoom / 2)]]
+  love.graphics.setColor(127, 255, 127, 255)
+  centreSmallString(""..bub.score, 100, screenHeight - 40, 2)
+  love.graphics.setColor(127, 127, 255, 255)
+  centreSmallString(""..bob.score, screenWidth - 100, screenHeight - 40, 2)
 end
 
 return {
