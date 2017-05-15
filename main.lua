@@ -5,6 +5,7 @@ local backgroundGen = require "backgroundGen"
 
 local state_titleScreen = require "state_titleScreen"
 local state_game = require "state_game"
+local state_gameOver = require "state_gameOver"
 
 local screenWidth, screenHeight
 
@@ -17,7 +18,7 @@ local GameState = nil -- the current game. "New Game" resets, "Load" sets up
 local keyDownCount = 0 -- helper for skip scenes
 
 -- function defs
-local runSetup,startGame,exitGame,pauseGame
+local runSetup,startGame,gameOver
 
 -- Load non dynamic values
 function love.load()
@@ -49,14 +50,21 @@ function love.load()
   math.randomseed(os.time())
   state_titleScreen.Initialise(assets)
   state_game.Initialise(assets)
+  --state_gameOver.Initialise(assets)
 
-  love.handlers['runSetup'] = runSetup
   love.handlers['startGame'] = startGame
-  love.handlers['exitGame'] = exitGame
-  love.handlers['pauseGame'] = pauseGame
+  love.handlers['gameOver'] = gameOver
 
   love.audio.mute()
   CurrentGlobalState = state_titleScreen
+end
+
+local timeLimit = 60 * 10
+function gSetTimeLimit(minutes)
+  timeLimit = 10 ---60 * minutes
+end
+function gGetTimeLimit()
+  return timeLimit
 end
 
 -- A few useful global funcitons
@@ -79,26 +87,11 @@ function indexInTable(tab, obj)
   return nil
 end
 
-runSetup = function()
-  --[[state_configure.Reset()
-  CurrentGlobalState = state_configure]]
-end
-
-runSetupGamepad = function()
-  --[[state_configureGamepad.Reset()
-  CurrentGlobalState = state_configureGamepad]]
-end
-
 startGame = function()
-  --[[if (GameState == nil) then return end]]
+  state_game.Reset()
   CurrentGlobalState = state_game
 end
-pauseGame = function()
-  --[[if (CurrentGlobalState ~= state_game) then return end
-  state_pause.Reset()
-  CurrentGlobalState = state_pause]]
-end
-exitGame = function()
+gameOver = function()
   state_titleScreen.Reset()
   CurrentGlobalState = state_titleScreen
 end

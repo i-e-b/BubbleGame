@@ -10,6 +10,7 @@ local assets -- local copy of game-wide assets
 local levelWorld, blockImage -- level collision and graphics
 local screenWidth, screenHeight
 local readyForInput
+local timeRemaining = 1000
 
 local bub = {isPlayer=true, anims={}, canJump=false, burp=0, score=0} -- green dino
 local bob = {isPlayer=true, anims={}, canJump=false, burp=0, score=0} -- blue dino
@@ -21,7 +22,7 @@ local walkingZen = {} -- list of robots
 local loots = {} -- list of food waiting to be picked up
 local leftStartX, rightStartX
 
-local Initialise,Draw,Update, playerFilter, setAnim, updateDino, triggerBubble,
+local Initialise,Draw,Update,Reset, playerFilter, setAnim, updateDino, triggerBubble,
       drawBubbles, updateBubbles, bubbleFilter, addZen, drawZens, zenFilter,
       spawnLoot, updateLoot, drawLoot, removeLoot, fruitFilter
 
@@ -78,21 +79,27 @@ Initialise = function(coreAssets)
 
   addZen()
   addZen()
+
+  timeRemaining = gGetTimeLimit()
+end
+
+Reset = function()
+  timeRemaining = gGetTimeLimit()
 end
 
 addZen = function ()
   local left = math.random(0,1) > 0.5
   local zen = { isCreep=true, anims=protoZen.anims, y=0, dy = 0 }
   if left then
-    zen.x = leftStartX
+    zen.x = leftStartX + (#walkingZen * 40)
     zen.lastDir = "right"
     zen.anim = zen.anims['right']:clone()
     zen.dx = 100
   else
-    zen.x = rightStartX
+    zen.x = rightStartX - (#walkingZen * 40)
     zen.lastDir = "left"
     zen.anim = zen.anims['left']:clone()
-    zen.dx = 100
+    zen.dx = -100
   end
   levelWorld:add(zen, zen.x, zen.y, 34, 38)
   table.insert(walkingZen, zen)
@@ -405,6 +412,11 @@ end
 Update = function(dt, keyDownCount, connectedPad)
   if (dt > 1) then return end
 
+  timeRemaining = timeRemaining - dt
+  if (timeRemaining < 0) then
+    love.event.push('gameOver', nil)
+  end
+
   local ctrl = {
     up = love.keyboard.isDown("up"),
     down = love.keyboard.isDown("down"),
@@ -495,14 +507,18 @@ Draw = function()
   drawZens()
 
   love.graphics.setFont(assets.smallfont)
-  love.graphics.setColor(127, 255, 127, 255)
+  love.graphics.setColor(0, 255, 0, 255)
   centreSmallString(""..bub.score, 100, screenHeight - 40, 2)
-  love.graphics.setColor(127, 127, 255, 255)
+  love.graphics.setColor(0, 0, 255, 255)
   centreSmallString(""..bob.score, screenWidth - 100, screenHeight - 40, 2)
+
+  love.graphics.setColor(255, 255, 255, 255)
+  centreSmallString(""..math.ceil(timeRemaining / 60).." minutes left", screenWidth / 2, screenHeight - 40, 2)
 end
 
 return {
   Initialise = Initialise,
   Draw = Draw,
-  Update = Update
+  Update = Update,
+  Reset = Reset
 }

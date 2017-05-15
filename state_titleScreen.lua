@@ -79,9 +79,11 @@ end
 
 triggerAction = function ()
   if (selection == 1) then
+    gSetTimeLimit(20)
     love.event.push('startGame', nil)
   elseif (selection == 2) then
-    love.event.push('runSetup')
+    gSetTimeLimit(10)
+    love.event.push('startGame', nil)
   elseif (selection == 3) then
     love.event.quit()
   end
