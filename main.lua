@@ -2,6 +2,7 @@ require "miniSound"           -- audio manager
 local anim8 = require "anim8" -- character animations
 local flux = require "flux"   -- movement tweening. Modified from standard
 local backgroundGen = require "backgroundGen"
+require "globalJoystick"      -- gloabl func for reading mapped joystick controls
 
 local state_titleScreen = require "state_titleScreen"
 local state_game = require "state_game"
@@ -32,6 +33,7 @@ function love.load()
   assets.bigfont = love.graphics.newImageFont("assets/bigfont.png", " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+-.,?!")
   assets.smallfont = love.graphics.newImageFont("assets/smallfont.png", " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!?-+/():;%&`'*#=[]>")
   assets.titlebg = love.graphics.newImage("assets/titlebg.png")
+  assets.gameOverbg = love.graphics.newImage("assets/win.png")
   assets.levelBg1 = backgroundGen.drawBgToImg(screenWidth, screenHeight, 244, 140, 170)
 
 
@@ -50,7 +52,7 @@ function love.load()
   math.randomseed(os.time())
   state_titleScreen.Initialise(assets)
   state_game.Initialise(assets)
-  --state_gameOver.Initialise(assets)
+  state_gameOver.Initialise(assets)
 
   love.handlers['startGame'] = startGame
   love.handlers['gameOver'] = gameOver
@@ -61,13 +63,13 @@ end
 
 local timeLimit = 60 * 10
 function gSetTimeLimit(minutes)
-  timeLimit = 10 ---60 * minutes
+  timeLimit = 60 * minutes
 end
 function gGetTimeLimit()
   return timeLimit
 end
 
--- A few useful global funcitons
+-- A few useful global functions
 function centreBigString (str, x, y, scale)
   scale = scale or 1
   local w = scale * assets.bigfont:getWidth(str) / 2
@@ -92,8 +94,8 @@ startGame = function()
   CurrentGlobalState = state_game
 end
 gameOver = function()
-  state_titleScreen.Reset()
-  CurrentGlobalState = state_titleScreen
+  state_gameOver.Reset()
+  CurrentGlobalState = state_gameOver
 end
 
 -- connect joysticks and gamepads
@@ -145,7 +147,6 @@ function love.keypressed(key)
 end
 function love.joystickpressed(joystick,button)
   keyDownCount = keyDownCount + 1
-  if button == 10 then pauseGame() end
 end
 function love.mousepressed( x, y, button, istouch )
   keyDownCount = keyDownCount + 1

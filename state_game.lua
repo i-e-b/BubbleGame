@@ -417,21 +417,24 @@ Update = function(dt, keyDownCount, connectedPad)
     love.event.push('gameOver', nil)
   end
 
+  local joy1 = readJoy(1)
   local ctrl = {
-    up = love.keyboard.isDown("up"),
-    down = love.keyboard.isDown("down"),
-    left = love.keyboard.isDown("left"),
-    right = love.keyboard.isDown("right"),
-    act = love.keyboard.isDown("space")
+    up = joy1.up or love.keyboard.isDown("up"),
+    down = joy1.down or love.keyboard.isDown("down"),
+    left = joy1.left or love.keyboard.isDown("left"),
+    right = joy1.right or love.keyboard.isDown("right"),
+    act = joy1.act or love.keyboard.isDown("space")
   }
   updateDino(bub, ctrl, dt)
 
+
+  local joy2 = readJoy(2)
   ctrl = {
-    up = love.keyboard.isDown("w"),
-    down = love.keyboard.isDown("s"),
-    left = love.keyboard.isDown("a"),
-    right = love.keyboard.isDown("d"),
-    act = love.keyboard.isDown("lctrl")
+    up = joy2.up or love.keyboard.isDown("w"),
+    down = joy2.down or love.keyboard.isDown("s"),
+    left = joy2.left or love.keyboard.isDown("a"),
+    right = joy2.right or love.keyboard.isDown("d"),
+    act = joy2.act or love.keyboard.isDown("lctrl")
   }
   updateDino(bob, ctrl, dt)
 
